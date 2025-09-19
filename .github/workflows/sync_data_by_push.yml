@@ -9,7 +9,7 @@ on:
 
 env:
   # change env here
-  GITHUB_NAME: naosense
+  GITHUB_NAME: prime167
   GITHUB_EMAIL: pingao777@gmail.com
 
 jobs:
