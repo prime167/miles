@@ -3,7 +3,7 @@ import calendar
 import math
 import sys
 from datetime import datetime
-from typing import Callable, Optional, TypeVar
+from typing import Callable, Optional, TypeVar, List, Tuple
 import numpy as np
 
 import matplotlib.dates as mdates
@@ -33,94 +33,99 @@ def plot_running() -> None:
         this_year = datetime.now().year
 
         ax.plot(dts, accs, color="#d62728")
-        ax2 = plt.axes([0.1, 0.80, 0.3, 0.1])
-        v11 = ax2.violinplot(
-            hearts,
-            orientation="horizontal",
-            showmedians=True,
-            showmeans=True,
-            showextrema=False,
-            side="low",
-        )
-        hearts_this_year = [
-            hearts[i] for i, dt in enumerate(dts) if dt.year == this_year
-        ]
-        v12 = ax2.violinplot(
-            hearts_this_year,
-            orientation="horizontal",
-            showmedians=True,
-            showmeans=True,
-            showextrema=False,
-            side="high",
-        )
+        
+        # 只在有心率数据时绘制心率小提琴图
+        if hearts:
+            ax2 = plt.axes([0.1, 0.80, 0.3, 0.1])
+            v11 = ax2.violinplot(
+                hearts,
+                orientation="horizontal",
+                showmedians=True,
+                showmeans=True,
+                showextrema=False,
+                side="low",
+            )
+            hearts_this_year = [
+                hearts[i] for i, dt in enumerate(dts) if dt.year == this_year and hearts[i] is not None
+            ]
+            v12 = ax2.violinplot(
+                hearts_this_year,
+                orientation="horizontal",
+                showmedians=True,
+                showmeans=True,
+                showextrema=False,
+                side="high",
+            )
 
-        for body in v11["bodies"]:
-            body.set_facecolor("#ff7f0e")
-            body.set_edgecolor("#ff7f0e")
-        for body in v12["bodies"]:
-            body.set_facecolor("#2ca02c")
-            body.set_edgecolor("#2ca02c")
-        v11["cmedians"].set_linewidth(1)
-        v11["cmedians"].set_color("#ff7f0e")
-        v12["cmedians"].set_linewidth(1)
-        v12["cmedians"].set_color("#2ca02c")
-        v11["cmeans"].set_linewidth(1)
-        v11["cmeans"].set_color("#ff7f0e")
-        v12["cmeans"].set_linewidth(1)
-        v12["cmeans"].set_color("#2ca02c")
-        v11["cmeans"].set_linestyle("--")
-        v12["cmeans"].set_linestyle("--")
+            for body in v11["bodies"]:
+                body.set_facecolor("#ff7f0e")
+                body.set_edgecolor("#ff7f0e")
+            for body in v12["bodies"]:
+                body.set_facecolor("#2ca02c")
+                body.set_edgecolor("#2ca02c")
+            v11["cmedians"].set_linewidth(1)
+            v11["cmedians"].set_color("#ff7f0e")
+            v12["cmedians"].set_linewidth(1)
+            v12["cmedians"].set_color("#2ca02c")
+            v11["cmeans"].set_linewidth(1)
+            v11["cmeans"].set_color("#ff7f0e")
+            v12["cmeans"].set_linewidth(1)
+            v12["cmeans"].set_color("#2ca02c")
+            v11["cmeans"].set_linestyle("--")
+            v12["cmeans"].set_linestyle("--")
 
-        hearts_percentile = np.percentile(hearts, [5, 95])
-        ax2.set_xlim(tuple(hearts_percentile))
-        ax2.set_yticklabels([])
-        ax2.spines[["top", "right", "left", "bottom"]].set_visible(False)
-        ax2.tick_params(axis="x", which="major", labelsize="xx-small", length=2)
-        ax2.tick_params(axis="y", which="major", labelsize="xx-small", length=0)
+            hearts_percentile = np.percentile([h for h in hearts if h is not None], [5, 95])
+            ax2.set_xlim(tuple(hearts_percentile))
+            ax2.set_yticklabels([])
+            ax2.spines[["top", "right", "left", "bottom"]].set_visible(False)
+            ax2.tick_params(axis="x", which="major", labelsize="xx-small", length=2)
+            ax2.tick_params(axis="y", which="major", labelsize="xx-small", length=0)
 
-        ax3 = plt.axes([0.1, 0.65, 0.3, 0.1])
-        v21 = ax3.violinplot(
-            paces,
-            orientation="horizontal",
-            showmedians=True,
-            showmeans=True,
-            showextrema=False,
-            side="low",
-        )
-        paces_this_year = [paces[i] for i, dt in enumerate(dts) if dt.year == this_year]
-        v22 = ax3.violinplot(
-            paces_this_year,
-            orientation="horizontal",
-            showmedians=True,
-            showmeans=True,
-            showextrema=False,
-            side="high",
-        )
-        for body in v21["bodies"]:
-            body.set_facecolor("#ff7f0e")
-            body.set_edgecolor("#ff7f0e")
-        for body in v22["bodies"]:
-            body.set_facecolor("#2ca02c")
-            body.set_edgecolor("#2ca02c")
-        v21["cmedians"].set_linewidth(1)
-        v21["cmedians"].set_color("#ff7f0e")
-        v22["cmedians"].set_linewidth(1)
-        v22["cmedians"].set_color("#2ca02c")
-        v21["cmeans"].set_linewidth(1)
-        v21["cmeans"].set_color("#ff7f0e")
-        v22["cmeans"].set_linewidth(1)
-        v22["cmeans"].set_color("#2ca02c")
-        v21["cmeans"].set_linestyle("--")
-        v22["cmeans"].set_linestyle("--")
+        # 只在有配速数据时绘制配速小提琴图
+        if paces:
+            ax3 = plt.axes([0.1, 0.65, 0.3, 0.1])
+            v21 = ax3.violinplot(
+                [p for p in paces if p is not None],
+                orientation="horizontal",
+                showmedians=True,
+                showmeans=True,
+                showextrema=False,
+                side="low",
+            )
+            paces_this_year = [paces[i] for i, dt in enumerate(dts) if dt.year == this_year and paces[i] is not None]
+            v22 = ax3.violinplot(
+                paces_this_year,
+                orientation="horizontal",
+                showmedians=True,
+                showmeans=True,
+                showextrema=False,
+                side="high",
+            )
+            for body in v21["bodies"]:
+                body.set_facecolor("#ff7f0e")
+                body.set_edgecolor("#ff7f0e")
+            for body in v22["bodies"]:
+                body.set_facecolor("#2ca02c")
+                body.set_edgecolor("#2ca02c")
+            v21["cmedians"].set_linewidth(1)
+            v21["cmedians"].set_color("#ff7f0e")
+            v22["cmedians"].set_linewidth(1)
+            v22["cmedians"].set_color("#2ca02c")
+            v21["cmeans"].set_linewidth(1)
+            v21["cmeans"].set_color("#ff7f0e")
+            v22["cmeans"].set_linewidth(1)
+            v22["cmeans"].set_color("#2ca02c")
+            v21["cmeans"].set_linestyle("--")
+            v22["cmeans"].set_linestyle("--")
 
-        paces_percentile = np.percentile(paces, [5, 95])
-        ax3.set_xlim(tuple(paces_percentile))
-        ax3.set_yticklabels([])
-        ax3.spines[["top", "right", "left", "bottom"]].set_visible(False)
-        ax3.tick_params(axis="x", which="major", labelsize="xx-small", length=2)
-        ax3.tick_params(axis="y", which="major", labelsize="xx-small", length=0)
-        ax3.xaxis.set_major_locator(tick.MaxNLocator(6))
-        ax3.xaxis.set_major_formatter(tick.FuncFormatter(pace_label_fmt))
+            paces_percentile = np.percentile([p for p in paces if p is not None], [5, 95])
+            ax3.set_xlim(tuple(paces_percentile))
+            ax3.set_yticklabels([])
+            ax3.spines[["top", "right", "left", "bottom"]].set_visible(False)
+            ax3.tick_params(axis="x", which="major", labelsize="xx-small", length=2)
+            ax3.tick_params(axis="y", which="major", labelsize="xx-small", length=0)
+            ax3.xaxis.set_major_locator(tick.MaxNLocator(6))
+            ax3.xaxis.set_major_formatter(tick.FuncFormatter(pace_label_fmt))
 
         attendance_all, attendance_this_year = tuple(
             map(make_circular, get_attendance(dts))
@@ -263,7 +268,7 @@ def groupby(data: list[T], key_func: Callable[[T], K]) -> dict[K, list[T]]:
 
 
 def get_running_data() -> tuple[
-    list[datetime], list[float], list[float], list[int], list[int]
+    list[datetime], list[float], list[float], list[Optional[int]], list[Optional[int]]
 ]:
     data = []
     with open("running.csv") as file:
@@ -271,17 +276,39 @@ def get_running_data() -> tuple[
             cols = line.rstrip().split(",")
             if cols[0] == "DT":
                 continue
-            dt = datetime.strptime(cols[0], "%Y-%m-%d %H:%M:%S")
-            distance = float(cols[1])
-            heart = int(cols[2]) if cols[2].isdecimal() else None
-            # garmin数据中配速为整分整秒时，比如6:00，传过来的原始值竟然是5:60
-            mins, secs = [int(i) for i in cols[3].split(":")]
-            if secs == 60:
-                mins = mins + 1
-                secs = 0
+                
+            # 支持两种日期格式：yyyy-MM-dd HH:mm:ss 和 yyyy-MM-dd
+            try:
+                dt = datetime.strptime(cols[0], "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                try:
+                    dt = datetime.strptime(cols[0], "%Y-%m-%d")
+                except ValueError:
+                    print(f"Invalid date format: {cols[0]}")
+                    continue
+                    
+            distance = float(cols[1]) if cols[1] else 0.0
+            
+            # 处理心率为空的情况
+            heart = int(cols[2]) if cols[2] and cols[2].isdecimal() else None
+            
+            # 处理配速为空的情况
+            pace = None
+            if cols[3] and ":" in cols[3]:
+                try:
+                    mins, secs = [int(i) for i in cols[3].split(":")]
+                    if secs == 60:
+                        mins = mins + 1
+                        secs = 0
+                    pace = mins * 60 + secs
+                except ValueError:
+                    pace = None
+            
             if distance <= 0.0:
                 continue
-            data.append((dt, distance, heart, mins * 60 + secs))
+                
+            data.append((dt, distance, heart, pace))
+            
     data.sort(key=lambda t: t[0])
     acc = 0.0
     dts = []
@@ -294,8 +321,7 @@ def get_running_data() -> tuple[
         dts.append(dt)
         accs.append(acc)
         distances.append(distance)
-        if heart:
-            hearts.append(heart)
+        hearts.append(heart)
         paces.append(pace)
     return dts, accs, distances, hearts, paces
 
@@ -315,18 +341,29 @@ def sync_data(dt_str: str, distance_str: str, heart_str: str, pace_str: str) -> 
     elif len(paces) != n:
         print("pace length not equal dt length")
         return False
+        
     dts, _, _, _, _ = get_running_data()
     if dts:
         latest = dts[-1]
-        new_data = [
-            (dt_str, distances[i], hearts[i], paces[i])
-            for i, dt_str in enumerate(dt_strs)
-            if datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S") > latest
-        ]
+        new_data = []
+        for i, dt_str_item in enumerate(dt_strs):
+            # 支持两种日期格式
+            try:
+                dt = datetime.strptime(dt_str_item, "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                try:
+                    dt = datetime.strptime(dt_str_item, "%Y-%m-%d")
+                except ValueError:
+                    print(f"Invalid date format: {dt_str_item}")
+                    continue
+            
+            if dt > latest:
+                new_data.append((dt_str_item, distances[i], hearts[i], paces[i]))
+                
         if new_data:
             with open("running.csv", "a") as f:
                 for dt_str, distance, heart, pace in sorted(
-                    new_data, key=lambda t: t[0]
+                    new_data, key=lambda t: datetime.strptime(t[0], "%Y-%m-%d %H:%M:%S") if ":" in t[0] else datetime.strptime(t[0], "%Y-%m-%d")
                 ):
                     f.write(f"{dt_str},{distance},{heart},{pace}\n")
         else:
@@ -349,6 +386,8 @@ if __name__ == "__main__":
     if op != "http" and op != "push":
         sys.exit("op must be http or push")
     if op == "http":
+        if len(args) < 6:
+            sys.exit("args is not right, e.g. python main.py http 2022-01-02 12:00:21 140 4:56")
         if sync_data(args[2], args[3], args[4], args[5]):
             plot_running()
     elif op == "push":
