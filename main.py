@@ -11,7 +11,9 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as tick
 from matplotlib.offsetbox import AnnotationBbox, OffsetImage
 
+# ---------------------- 可配置项 ----------------------
 RUNNER = "prime167"
+# -----------------------------------------------------
 
 T = TypeVar("T")
 K = TypeVar("K")
@@ -271,13 +273,19 @@ def get_running_data() -> tuple[
     list[datetime], list[float], list[float], list[Optional[int]], list[Optional[int]]
 ]:
     data = []
-    with open("running.csv") as file:
-        for line in file:
-            cols = line.rstrip().split(",")
+    with open("running.csv", encoding="utf-8") as file:
+        for line_num, line in enumerate(file, 1):
+            line = line.strip()
+            if not line:
+                continue  # 跳过空行
+            cols = line.split(",")
             if cols[0] == "DT":
+                continue  # 跳过标题行
+            if len(cols) < 2:
+                print(f"Line {line_num}: too few columns: {line}")
                 continue
-                
-            # 支持两种日期格式：yyyy-MM-dd HH:mm:ss 和 yyyy-MM-dd
+
+            # 解析日期
             try:
                 dt = datetime.strptime(cols[0], "%Y-%m-%d %H:%M:%S")
             except ValueError:
@@ -286,37 +294,54 @@ def get_running_data() -> tuple[
                 except ValueError:
                     print(f"Invalid date format: {cols[0]}")
                     continue
-                    
-            distance = float(cols[1]) if cols[1] else 0.0
-            
-            # 处理心率为空的情况
-            heart = int(cols[2]) if cols[2] and cols[2].isdecimal() else None
-            
-            # 处理配速为空的情况
-            pace = None
-            if cols[3] and ":" in cols[3]:
+
+            # 解析距离
+            try:
+                distance = float(cols[1]) if cols[1].strip() else 0.0
+            except (ValueError, IndexError):
+                distance = 0.0
+
+            # 解析心率
+            heart = None
+            if len(cols) > 2 and cols[2].strip():
                 try:
-                    mins, secs = [int(i) for i in cols[3].split(":")]
-                    if secs == 60:
-                        mins = mins + 1
-                        secs = 0
-                    pace = mins * 60 + secs
+                    heart = int(cols[2])
                 except ValueError:
-                    pace = None
-            
+                    heart = None
+
+            # 解析配速（支持 7:25, 7′25″, 7'25" 等格式）
+            pace = None
+            if len(cols) > 3 and cols[3].strip():
+                pace_str = cols[3].strip()
+                import re
+                match = re.match(r"^\s*(\d+)\s*[:′'′’′‘’‘]\s*(\d+)\s*[″""′'′’″”]*\s*$", pace_str)
+                if match:
+                    try:
+                        mins, secs = int(match.group(1)), int(match.group(2))
+                        if 0 <= secs < 60:
+                            pace = mins * 60 + secs
+                        elif secs == 60:
+                            pace = (mins + 1) * 60
+                    except Exception:
+                        pace = None
+
             if distance <= 0.0:
                 continue
-                
+
             data.append((dt, distance, heart, pace))
-            
+
+    if not data:
+        print("No valid running data found.")
+        return [], [], [], [], []
+
     data.sort(key=lambda t: t[0])
-    acc = 0.0
     dts = []
     accs = []
     distances = []
     hearts = []
     paces = []
-    for idx, (dt, distance, heart, pace) in enumerate(data):
+    acc = 0.0
+    for dt, distance, heart, pace in data:
         acc += distance
         dts.append(dt)
         accs.append(acc)
@@ -341,38 +366,34 @@ def sync_data(dt_str: str, distance_str: str, heart_str: str, pace_str: str) -> 
     elif len(paces) != n:
         print("pace length not equal dt length")
         return False
-        
+
     dts, _, _, _, _ = get_running_data()
-    if dts:
-        latest = dts[-1]
-        new_data = []
-        for i, dt_str_item in enumerate(dt_strs):
-            # 支持两种日期格式
+    latest = dts[-1] if dts else None
+    new_data = []
+    for i, dt_str_item in enumerate(dt_strs):
+        try:
+            dt = datetime.strptime(dt_str_item, "%Y-%m-%d %H:%M:%S")
+        except ValueError:
             try:
-                dt = datetime.strptime(dt_str_item, "%Y-%m-%d %H:%M:%S")
+                dt = datetime.strptime(dt_str_item, "%Y-%m-%d")
             except ValueError:
-                try:
-                    dt = datetime.strptime(dt_str_item, "%Y-%m-%d")
-                except ValueError:
-                    print(f"Invalid date format: {dt_str_item}")
-                    continue
-            
-            if dt > latest:
-                new_data.append((dt_str_item, distances[i], hearts[i], paces[i]))
-                
-        if new_data:
-            with open("running.csv", "a") as f:
-                for dt_str, distance, heart, pace in sorted(
-                    new_data, key=lambda t: datetime.strptime(t[0], "%Y-%m-%d %H:%M:%S") if ":" in t[0] else datetime.strptime(t[0], "%Y-%m-%d")
-                ):
-                    f.write(f"{dt_str},{distance},{heart},{pace}\n")
-        else:
-            print("no new data")
-            return False
+                print(f"Invalid date format: {dt_str_item}")
+                continue
+
+        if latest is None or dt > latest:
+            new_data.append((dt_str_item, distances[i], hearts[i], paces[i]))
+
+    if new_data:
+        with open("running.csv", "a", encoding="utf-8") as f:
+            for dt_str, distance, heart, pace in sorted(
+                new_data,
+                key=lambda t: datetime.strptime(t[0], "%Y-%m-%d %H:%M:%S") if ":" in t[0]
+                else datetime.strptime(t[0], "%Y-%m-%d")
+            ):
+                f.write(f"{dt_str},{distance},{heart},{pace}\n")
     else:
-        with open("running.csv", "a") as f:
-            for i, dt_str in enumerate(dt_strs):
-                f.write(f"{dt_str},{distances[i]},{hearts[i]},{paces[i]}\n")
+        print("no new data")
+        return False
     return True
 
 
@@ -380,17 +401,17 @@ if __name__ == "__main__":
     args = sys.argv
     if len(args) < 2:
         sys.exit(
-            "args is not right, e.g. python main.py http 2022-01-02 12:00:21 140 4:56"
+            "args is not right, e.g. python main.py http 2022-01-02 14.0 140 4:56"
         )
     op = args[1]
     if op != "http" and op != "push":
         sys.exit("op must be http or push")
     if op == "http":
         if len(args) < 6:
-            sys.exit("args is not right, e.g. python main.py http 2022-01-02 12:00:21 140 4:56")
+            sys.exit("args is not right, e.g. python main.py http 2022-01-02 14.0 140 4:56")
         if sync_data(args[2], args[3], args[4], args[5]):
             plot_running()
     elif op == "push":
         plot_running()
     else:
-        sys.exit("args is not right, e.g. python main.py http 2022-01-02 12:00:21")
+        sys.exit("args is not right.")
