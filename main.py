@@ -37,97 +37,107 @@ def plot_running() -> None:
         ax.plot(dts, accs, color="#d62728")
         
         # 只在有心率数据时绘制心率小提琴图
+                # 只在有心率数据时绘制心率小提琴图
         if hearts:
             ax2 = plt.axes([0.1, 0.80, 0.3, 0.1])
-            v11 = ax2.violinplot(
-                hearts,
-                orientation="horizontal",
-                showmedians=True,
-                showmeans=True,
-                showextrema=False,
-                side="low",
-            )
-            hearts_this_year = [
-                hearts[i] for i, dt in enumerate(dts) if dt.year == this_year and hearts[i] is not None
-            ]
-            v12 = ax2.violinplot(
-                hearts_this_year,
-                orientation="horizontal",
-                showmedians=True,
-                showmeans=True,
-                showextrema=False,
-                side="high",
-            )
+            hearts_clean = [h for h in hearts if h is not None]
+            if hearts_clean:
+                v11 = ax2.violinplot(
+                    hearts_clean,
+                    orientation="horizontal",
+                    showmedians=True,
+                    showmeans=True,
+                    showextrema=False,
+                    side="low",
+                )
+                hearts_this_year = [
+                    hearts[i] for i, dt in enumerate(dts) if dt.year == this_year and hearts[i] is not None
+                ]
+                v12 = ax2.violinplot(
+                    hearts_this_year,
+                    orientation="horizontal",
+                    showmedians=True,
+                    showmeans=True,
+                    showextrema=False,
+                    side="high",
+                )
 
-            for body in v11["bodies"]:
-                body.set_facecolor("#ff7f0e")
-                body.set_edgecolor("#ff7f0e")
-            for body in v12["bodies"]:
-                body.set_facecolor("#2ca02c")
-                body.set_edgecolor("#2ca02c")
-            v11["cmedians"].set_linewidth(1)
-            v11["cmedians"].set_color("#ff7f0e")
-            v12["cmedians"].set_linewidth(1)
-            v12["cmedians"].set_color("#2ca02c")
-            v11["cmeans"].set_linewidth(1)
-            v11["cmeans"].set_color("#ff7f0e")
-            v12["cmeans"].set_linewidth(1)
-            v12["cmeans"].set_color("#2ca02c")
-            v11["cmeans"].set_linestyle("--")
-            v12["cmeans"].set_linestyle("--")
+                for body in v11["bodies"]:
+                    body.set_facecolor("#ff7f0e")
+                    body.set_edgecolor("#ff7f0e")
+                for body in v12["bodies"]:
+                    body.set_facecolor("#2ca02c")
+                    body.set_edgecolor("#2ca02c")
+                v11["cmedians"].set_linewidth(1)
+                v11["cmedians"].set_color("#ff7f0e")
+                v12["cmedians"].set_linewidth(1)
+                v12["cmedians"].set_color("#2ca02c")
+                v11["cmeans"].set_linewidth(1)
+                v11["cmeans"].set_color("#ff7f0e")
+                v12["cmeans"].set_linewidth(1)
+                v12["cmeans"].set_color("#2ca02c")
+                v11["cmeans"].set_linestyle("--")
+                v12["cmeans"].set_linestyle("--")
 
-            hearts_percentile = np.percentile([h for h in hearts if h is not None], [5, 95])
-            ax2.set_xlim(tuple(hearts_percentile))
+                hearts_percentile = np.percentile(hearts_clean, [5, 95])
+                ax2.set_xlim(tuple(hearts_percentile))
+            else:
+                ax2.text(0.5, 0.5, "No HR", transform=ax2.transAxes, ha="center", va="center", fontsize="small")
             ax2.set_yticklabels([])
             ax2.spines[["top", "right", "left", "bottom"]].set_visible(False)
             ax2.tick_params(axis="x", which="major", labelsize="xx-small", length=2)
             ax2.tick_params(axis="y", which="major", labelsize="xx-small", length=0)
 
         # 只在有配速数据时绘制配速小提琴图
+                # 只在有配速数据时绘制配速小提琴图
         if paces:
             ax3 = plt.axes([0.1, 0.65, 0.3, 0.1])
-            v21 = ax3.violinplot(
-                [p for p in paces if p is not None],
-                orientation="horizontal",
-                showmedians=True,
-                showmeans=True,
-                showextrema=False,
-                side="low",
-            )
-            paces_this_year = [paces[i] for i, dt in enumerate(dts) if dt.year == this_year and paces[i] is not None]
-            v22 = ax3.violinplot(
-                paces_this_year,
-                orientation="horizontal",
-                showmedians=True,
-                showmeans=True,
-                showextrema=False,
-                side="high",
-            )
-            for body in v21["bodies"]:
-                body.set_facecolor("#ff7f0e")
-                body.set_edgecolor("#ff7f0e")
-            for body in v22["bodies"]:
-                body.set_facecolor("#2ca02c")
-                body.set_edgecolor("#2ca02c")
-            v21["cmedians"].set_linewidth(1)
-            v21["cmedians"].set_color("#ff7f0e")
-            v22["cmedians"].set_linewidth(1)
-            v22["cmedians"].set_color("#2ca02c")
-            v21["cmeans"].set_linewidth(1)
-            v21["cmeans"].set_color("#ff7f0e")
-            v22["cmeans"].set_linewidth(1)
-            v22["cmeans"].set_color("#2ca02c")
-            v21["cmeans"].set_linestyle("--")
-            v22["cmeans"].set_linestyle("--")
+            paces_clean = [p for p in paces if p is not None]
+            if paces_clean:
+                v21 = ax3.violinplot(
+                    paces_clean,
+                    orientation="horizontal",
+                    showmedians=True,
+                    showmeans=True,
+                    showextrema=False,
+                    side="low",
+                )
+                paces_this_year = [paces[i] for i, dt in enumerate(dts) if dt.year == this_year and paces[i] is not None]
+                v22 = ax3.violinplot(
+                    paces_this_year,
+                    orientation="horizontal",
+                    showmedians=True,
+                    showmeans=True,
+                    showextrema=False,
+                    side="high",
+                )
+                for body in v21["bodies"]:
+                    body.set_facecolor("#ff7f0e")
+                    body.set_edgecolor("#ff7f0e")
+                for body in v22["bodies"]:
+                    body.set_facecolor("#2ca02c")
+                    body.set_edgecolor("#2ca02c")
+                v21["cmedians"].set_linewidth(1)
+                v21["cmedians"].set_color("#ff7f0e")
+                v22["cmedians"].set_linewidth(1)
+                v22["cmedians"].set_color("#2ca02c")
+                v21["cmeans"].set_linewidth(1)
+                v21["cmeans"].set_color("#ff7f0e")
+                v22["cmeans"].set_linewidth(1)
+                v22["cmeans"].set_color("#2ca02c")
+                v21["cmeans"].set_linestyle("--")
+                v22["cmeans"].set_linestyle("--")
 
-            paces_percentile = np.percentile([p for p in paces if p is not None], [5, 95])
-            ax3.set_xlim(tuple(paces_percentile))
+                paces_percentile = np.percentile(paces_clean, [5, 95])
+                ax3.set_xlim(tuple(paces_percentile))
+                ax3.xaxis.set_major_locator(tick.MaxNLocator(6))
+                ax3.xaxis.set_major_formatter(tick.FuncFormatter(pace_label_fmt))
+            else:
+                ax3.text(0.5, 0.5, "No Pace", transform=ax3.transAxes, ha="center", va="center", fontsize="small")
             ax3.set_yticklabels([])
             ax3.spines[["top", "right", "left", "bottom"]].set_visible(False)
             ax3.tick_params(axis="x", which="major", labelsize="xx-small", length=2)
             ax3.tick_params(axis="y", which="major", labelsize="xx-small", length=0)
-            ax3.xaxis.set_major_locator(tick.MaxNLocator(6))
-            ax3.xaxis.set_major_formatter(tick.FuncFormatter(pace_label_fmt))
 
         attendance_all, attendance_this_year = tuple(
             map(make_circular, get_attendance(dts))
