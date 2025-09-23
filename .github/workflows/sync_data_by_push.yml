@@ -10,7 +10,7 @@ on:
 env:
   # change env here
   GITHUB_NAME: prime167
-  GITHUB_EMAIL: pingao777@gmail.com
+  GITHUB_EMAIL: 3722845+prime167@users.noreply.github.com
 
 jobs:
   sync:
