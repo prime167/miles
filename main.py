@@ -37,6 +37,7 @@ def plot_running() -> None:
         ax.plot(dts, accs, color="#d62728")
         
         # 只在有心率数据时绘制心率小提琴图
+                # 只在有心率数据时绘制心率小提琴图
         if hearts:
             ax2 = plt.axes([0.1, 0.80, 0.3, 0.1])
             hearts_clean = [h for h in hearts if h is not None]
@@ -88,6 +89,7 @@ def plot_running() -> None:
             ax2.tick_params(axis="y", which="major", labelsize="xx-small", length=0)
 
         # 只在有配速数据时绘制配速小提琴图
+                # 只在有配速数据时绘制配速小提琴图
         if paces:
             ax3 = plt.axes([0.1, 0.65, 0.3, 0.1])
             paces_clean = [p for p in paces if p is not None]
@@ -433,7 +435,7 @@ def generate_heatmap(dts: list[datetime], distances: list[float]) -> None:
             daily_distances[date_key] += distances[i]
     
     # 创建SVG内容
-    svg_content = create_heatmap_svg(daily_distances, this_year, distances)
+    svg_content = create_heatmap_svg(daily_distances, this_year, dts, distances)
     
     # 保存SVG文件
     with open("heatmap.svg", "w", encoding="utf-8") as f:
@@ -441,7 +443,7 @@ def generate_heatmap(dts: list[datetime], distances: list[float]) -> None:
 
 
 # 新增函数：创建热力图SVG
-def create_heatmap_svg(daily_distances: dict, year: int, distances: list[float]) -> str:
+def create_heatmap_svg(daily_distances: dict, year: int, dts: list[datetime], distances: list[float]) -> str:
     # 定义颜色映射
     def get_color(distance: float) -> str:
         if distance <= 0:
@@ -462,29 +464,33 @@ def create_heatmap_svg(daily_distances: dict, year: int, distances: list[float])
             return "#c80064"  # 紫色 (9-10km+)
     
     # 计算统计数据
-    this_year_distances = [d for i, d in enumerate(distances) if datetime.now().year == datetime.now().year]
-    distance_this_year = sum([d for i, d in enumerate(distances) if datetime.now().year == datetime.now().year])
+    distance_this_year = sum([distances[i] for i, dt in enumerate(dts) if dt.year == year])
     distance_this_month = sum([
-        d for i, d in enumerate(distances) 
-        if datetime.now().year == datetime.now().year and datetime.now().month == datetime.now().month
+        distances[i] for i, dt in enumerate(dts) 
+        if dt.year == year and dt.month == datetime.now().month
     ])
     latest_distance = distances[-1] if distances else 0.0
     
     # 创建SVG头部
     svg_lines = [
-        '<svg xmlns="http://www.w3.org/2000/svg" width="820" height="180">',
+        '<svg xmlns="http://www.w3.org/2000/svg" width="850" height="180">',
         '<style>',
         '.month { font-size: 12px; fill: #767676; }',
         '.day { font-size: 10px; fill: #767676; }',
         '.value { font-size: 12px; fill: #000; }',
+        '.stat-label { font-size: 12px; fill: #767676; text-anchor: end; }',
+        '.stat-value { font-size: 12px; fill: #000; text-anchor: end; font-weight: bold; }',
         '</style>'
     ]
     
     # 添加标题和统计数据
     svg_lines.append(f'<text x="10" y="20" class="value">{year}</text>')
-    svg_lines.append(f'<text x="600" y="20" class="value">Total: {distance_this_year:.2f} km</text>')
-    svg_lines.append(f'<text x="600" y="40" class="value">This month: {distance_this_month:.2f} km</text>')
-    svg_lines.append(f'<text x="600" y="60" class="value">Latest: {latest_distance:.2f} km</text>')
+    svg_lines.append(f'<text x="750" y="20" class="stat-label">Total:</text>')
+    svg_lines.append(f'<text x="830" y="20" class="stat-value">{distance_this_year:.2f} km</text>')
+    svg_lines.append(f'<text x="750" y="40" class="stat-label">This month:</text>')
+    svg_lines.append(f'<text x="830" y="40" class="stat-value">{distance_this_month:.2f} km</text>')
+    svg_lines.append(f'<text x="750" y="60" class="stat-label">Latest:</text>')
+    svg_lines.append(f'<text x="830" y="60" class="stat-value">{latest_distance:.2f} km</text>')
     
     # 创建色块示例
     color_ranges = [
@@ -498,25 +504,25 @@ def create_heatmap_svg(daily_distances: dict, year: int, distances: list[float])
         (10.0, "#c80064")
     ]
     
-    svg_lines.append('<text x="600" y="90" class="day">0 km</text>')
+    svg_lines.append('<text x="600" y="90" class="day">Less</text>')
     for i, (threshold, color) in enumerate(color_ranges):
-        x = 600 + i * 25
-        svg_lines.append(f'<rect x="{x}" y="100" width="20" height="20" fill="{color}" stroke="#ccc" stroke-width="1"/>')
-    svg_lines.append('<text x="750" y="90" class="day">10+ km</text>')
+        x = 640 + i * 20
+        svg_lines.append(f'<rect x="{x}" y="80" width="18" height="18" fill="{color}" stroke="#ccc" stroke-width="1"/>')
+    svg_lines.append('<text x="800" y="90" class="day">More</text>')
     
-    # 创建热力图网格 (53周 x 7天)
+    # 创建热力图网格 (最多53周 x 7天)
     start_date = datetime(year, 1, 1)
     end_date = datetime(year, 12, 31)
     
     # 计算一年中的每一天
     current_date = start_date
-    day_index = 0
+    squares = []
     while current_date <= end_date:
         date_str = current_date.strftime("%Y-%m-%d")
         distance = daily_distances.get(date_str, 0.0)
         color = get_color(distance)
         
-        # 计算位置 (每周一行，每天一列)
+        # 计算位置 (每周一列，每天一行)
         week = current_date.isocalendar()[1]
         # 处理年初属于上一年最后一周的情况
         if week >= 52 and current_date.month == 1:
@@ -526,29 +532,41 @@ def create_heatmap_svg(daily_distances: dict, year: int, distances: list[float])
             
         day_of_week = current_date.weekday()  # 周一=0, 周日=6
         
-        x = 30 + week * 15
-        y = 40 + day_of_week * 15
+        x = 40 + week * 13
+        y = 40 + day_of_week * 13
         
-        # 添加矩形
-        svg_lines.append(f'<rect x="{x}" y="{y}" width="12" height="12" fill="{color}" stroke="#fff" stroke-width="1"/>')
-        
+        squares.append((x, y, color))
         current_date = datetime.fromordinal(current_date.toordinal() + 1)
-        day_index += 1
+    
+    # 添加矩形
+    for x, y, color in squares:
+        svg_lines.append(f'<rect x="{x}" y="{y}" width="11" height="11" fill="{color}" stroke="#fff" stroke-width="1"/>')
     
     # 添加月份标签
-    month_positions = [0, 4, 8, 12, 17, 21, 25, 30, 34, 38, 43, 47]
     month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", 
                    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
     
-    for i, (pos, name) in enumerate(zip(month_positions, month_names)):
-        x = 30 + pos * 15
-        svg_lines.append(f'<text x="{x}" y="30" class="month">{name}</text>')
+    # 找到每个月的第一天所在的位置
+    month_positions = {}
+    current_date = start_date
+    while current_date <= end_date:
+        if current_date.day == 1:
+            week = current_date.isocalendar()[1]
+            if week >= 52 and current_date.month == 1:
+                week = 0
+            month_positions[current_date.month] = week
+        current_date = datetime.fromordinal(current_date.toordinal() + 1)
     
-    # 添加星期标签
-    day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-    for i, day_name in enumerate(day_names):
-        y = 40 + i * 15 + 10
-        svg_lines.append(f'<text x="10" y="{y}" class="day">{day_name}</text>')
+    for month, week in month_positions.items():
+        x = 40 + week * 13
+        svg_lines.append(f'<text x="{x}" y="30" class="month">{month_names[month-1]}</text>')
+    
+    # 添加星期标签 (只添加周一、周三、周五)
+    day_names = ["Mon", "Wed", "Fri"]
+    day_indices = [0, 2, 4]
+    for i, (day_idx, day_name) in enumerate(zip(day_indices, day_names)):
+        y = 40 + day_idx * 13 + 10
+        svg_lines.append(f'<text x="20" y="{y}" class="day">{day_name}</text>')
     
     # 结束SVG
     svg_lines.append('</svg>')
