@@ -21,7 +21,7 @@ K = TypeVar("K")
 
 def plot_running() -> None:
     with plt.xkcd():
-        fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
+        fig, ax = plt.subplots(figsize=(12, 5), constrained_layout=True)
         ax.spines[["top", "right"]].set_visible(False)
         locator = mdates.AutoDateLocator(minticks=3, maxticks=7)
         formatter = mdates.ConciseDateFormatter(locator)
@@ -37,7 +37,6 @@ def plot_running() -> None:
         ax.plot(dts, accs, color="#d62728")
         
         # 只在有心率数据时绘制心率小提琴图
-                # 只在有心率数据时绘制心率小提琴图
         if hearts:
             ax2 = plt.axes([0.1, 0.80, 0.3, 0.1])
             hearts_clean = [h for h in hearts if h is not None]
@@ -89,7 +88,6 @@ def plot_running() -> None:
             ax2.tick_params(axis="y", which="major", labelsize="xx-small", length=0)
 
         # 只在有配速数据时绘制配速小提琴图
-                # 只在有配速数据时绘制配速小提琴图
         if paces:
             ax3 = plt.axes([0.1, 0.65, 0.3, 0.1])
             paces_clean = [p for p in paces if p is not None]
@@ -212,9 +210,11 @@ def plot_running() -> None:
                 frameon=False,
             )
         )
+        
+        # 添加热力图到现有SVG中
+        add_heatmap_to_figure(fig, dts, distances)
+        
         fig.savefig("miles.svg")
-        # 生成热力图
-        generate_heatmap(dts, distances)
 
 
 def pace_label_fmt(val: float, pos) -> str:
@@ -415,8 +415,8 @@ def sync_data(dt_str: str, distance_str: str, heart_str: str, pace_str: str) -> 
     return True
 
 
-# 新增函数：生成热力图
-def generate_heatmap(dts: list[datetime], distances: list[float]) -> None:
+# 新增函数：将热力图添加到现有图形中
+def add_heatmap_to_figure(fig, dts: list[datetime], distances: list[float]) -> None:
     # 创建当年每日跑步数据字典
     this_year = datetime.now().year
     daily_distances = {}
@@ -434,16 +434,6 @@ def generate_heatmap(dts: list[datetime], distances: list[float]) -> None:
             date_key = dt.strftime("%Y-%m-%d")
             daily_distances[date_key] += distances[i]
     
-    # 创建SVG内容
-    svg_content = create_heatmap_svg(daily_distances, this_year, dts, distances)
-    
-    # 保存SVG文件
-    with open("heatmap.svg", "w", encoding="utf-8") as f:
-        f.write(svg_content)
-
-
-# 新增函数：创建热力图SVG
-def create_heatmap_svg(daily_distances: dict, year: int, dts: list[datetime], distances: list[float]) -> str:
     # 定义颜色映射
     def get_color(distance: float) -> str:
         if distance <= 0:
@@ -464,33 +454,27 @@ def create_heatmap_svg(daily_distances: dict, year: int, dts: list[datetime], di
             return "#c80064"  # 紫色 (9-10km+)
     
     # 计算统计数据
-    distance_this_year = sum([distances[i] for i, dt in enumerate(dts) if dt.year == year])
+    distance_this_year = sum([distances[i] for i, dt in enumerate(dts) if dt.year == this_year])
     distance_this_month = sum([
         distances[i] for i, dt in enumerate(dts) 
-        if dt.year == year and dt.month == datetime.now().month
+        if dt.year == this_year and dt.month == datetime.now().month
     ])
     latest_distance = distances[-1] if distances else 0.0
     
-    # 创建SVG头部
-    svg_lines = [
-        '<svg xmlns="http://www.w3.org/2000/svg" width="850" height="180">',
-        '<style>',
-        '.month { font-size: 12px; fill: #767676; }',
-        '.day { font-size: 10px; fill: #767676; }',
-        '.value { font-size: 12px; fill: #000; }',
-        '.stat-label { font-size: 12px; fill: #767676; text-anchor: end; }',
-        '.stat-value { font-size: 12px; fill: #000; text-anchor: end; font-weight: bold; }',
-        '</style>'
-    ]
+    # 创建热力图轴
+    ax_heatmap = fig.add_axes([0.6, 0.3, 0.35, 0.6])  # [left, bottom, width, height]
+    ax_heatmap.set_xlim(0, 54)
+    ax_heatmap.set_ylim(0, 7)
+    ax_heatmap.axis('off')
     
     # 添加标题和统计数据
-    svg_lines.append(f'<text x="10" y="20" class="value">{year}</text>')
-    svg_lines.append(f'<text x="750" y="20" class="stat-label">Total:</text>')
-    svg_lines.append(f'<text x="830" y="20" class="stat-value">{distance_this_year:.2f} km</text>')
-    svg_lines.append(f'<text x="750" y="40" class="stat-label">This month:</text>')
-    svg_lines.append(f'<text x="830" y="40" class="stat-value">{distance_this_month:.2f} km</text>')
-    svg_lines.append(f'<text x="750" y="60" class="stat-label">Latest:</text>')
-    svg_lines.append(f'<text x="830" y="60" class="stat-value">{latest_distance:.2f} km</text>')
+    ax_heatmap.text(0, 6.5, f"{this_year}", fontsize=12, fontweight='bold')
+    ax_heatmap.text(45, 6.5, "Total:", fontsize=10, color='#767676', ha='right')
+    ax_heatmap.text(53, 6.5, f"{distance_this_year:.2f} km", fontsize=10, ha='right')
+    ax_heatmap.text(45, 5.8, "This month:", fontsize=10, color='#767676', ha='right')
+    ax_heatmap.text(53, 5.8, f"{distance_this_month:.2f} km", fontsize=10, ha='right')
+    ax_heatmap.text(45, 5.1, "Latest:", fontsize=10, color='#767676', ha='right')
+    ax_heatmap.text(53, 5.1, f"{latest_distance:.2f} km", fontsize=10, ha='right')
     
     # 创建色块示例
     color_ranges = [
@@ -504,15 +488,15 @@ def create_heatmap_svg(daily_distances: dict, year: int, dts: list[datetime], di
         (10.0, "#c80064")
     ]
     
-    svg_lines.append('<text x="600" y="90" class="day">Less</text>')
+    ax_heatmap.text(35, 4.2, "Less", fontsize=8, color='#767676')
     for i, (threshold, color) in enumerate(color_ranges):
-        x = 640 + i * 20
-        svg_lines.append(f'<rect x="{x}" y="80" width="18" height="18" fill="{color}" stroke="#ccc" stroke-width="1"/>')
-    svg_lines.append('<text x="800" y="90" class="day">More</text>')
+        x = 38 + i * 1.5
+        ax_heatmap.add_patch(plt.Rectangle((x, 4.1), 1.3, 1.3, facecolor=color, edgecolor="#ccc", linewidth=0.5))
+    ax_heatmap.text(50, 4.2, "More", fontsize=8, color='#767676')
     
     # 创建热力图网格 (最多53周 x 7天)
-    start_date = datetime(year, 1, 1)
-    end_date = datetime(year, 12, 31)
+    start_date = datetime(this_year, 1, 1)
+    end_date = datetime(this_year, 12, 31)
     
     # 计算一年中的每一天
     current_date = start_date
@@ -532,15 +516,16 @@ def create_heatmap_svg(daily_distances: dict, year: int, dts: list[datetime], di
             
         day_of_week = current_date.weekday()  # 周一=0, 周日=6
         
-        x = 40 + week * 13
-        y = 40 + day_of_week * 13
+        x = week + 1
+        y = 6 - day_of_week  # 反转Y轴，使周一在上
         
-        squares.append((x, y, color))
+        squares.append((x, y, color, distance))
         current_date = datetime.fromordinal(current_date.toordinal() + 1)
     
     # 添加矩形
-    for x, y, color in squares:
-        svg_lines.append(f'<rect x="{x}" y="{y}" width="11" height="11" fill="{color}" stroke="#fff" stroke-width="1"/>')
+    for x, y, color, distance in squares:
+        rect = plt.Rectangle((x, y), 0.85, 0.85, facecolor=color, edgecolor="#fff", linewidth=0.5)
+        ax_heatmap.add_patch(rect)
     
     # 添加月份标签
     month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", 
@@ -554,24 +539,22 @@ def create_heatmap_svg(daily_distances: dict, year: int, dts: list[datetime], di
             week = current_date.isocalendar()[1]
             if week >= 52 and current_date.month == 1:
                 week = 0
-            month_positions[current_date.month] = week
+            month_positions[current_date.month] = week + 1
         current_date = datetime.fromordinal(current_date.toordinal() + 1)
     
-    for month, week in month_positions.items():
-        x = 40 + week * 13
-        svg_lines.append(f'<text x="{x}" y="30" class="month">{month_names[month-1]}</text>')
+    for month, x_pos in month_positions.items():
+        ax_heatmap.text(x_pos, 7, month_names[month-1], fontsize=8, color='#767676')
     
-    # 添加星期标签 (只添加周一、周三、周五)
+    # 添加星期标签
     day_names = ["Mon", "Wed", "Fri"]
     day_indices = [0, 2, 4]
     for i, (day_idx, day_name) in enumerate(zip(day_indices, day_names)):
-        y = 40 + day_idx * 13 + 10
-        svg_lines.append(f'<text x="20" y="{y}" class="day">{day_name}</text>')
-    
-    # 结束SVG
-    svg_lines.append('</svg>')
-    
-    return "\n".join(svg_lines)
+        y_pos = 6 - day_idx
+        ax_heatmap.text(0, y_pos+0.3, day_name, fontsize=8, color='#767676')
+
+
+
+
 
 
 if __name__ == "__main__":
