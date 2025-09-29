@@ -21,7 +21,7 @@ K = TypeVar("K")
 
 def plot_running() -> None:
     with plt.xkcd():
-        fig, ax = plt.subplots(figsize=(12, 5), constrained_layout=True)
+        fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
         ax.spines[["top", "right"]].set_visible(False)
         locator = mdates.AutoDateLocator(minticks=3, maxticks=7)
         formatter = mdates.ConciseDateFormatter(locator)
@@ -37,6 +37,7 @@ def plot_running() -> None:
         ax.plot(dts, accs, color="#d62728")
         
         # 只在有心率数据时绘制心率小提琴图
+                # 只在有心率数据时绘制心率小提琴图
         if hearts:
             ax2 = plt.axes([0.1, 0.80, 0.3, 0.1])
             hearts_clean = [h for h in hearts if h is not None]
@@ -88,6 +89,7 @@ def plot_running() -> None:
             ax2.tick_params(axis="y", which="major", labelsize="xx-small", length=0)
 
         # 只在有配速数据时绘制配速小提琴图
+                # 只在有配速数据时绘制配速小提琴图
         if paces:
             ax3 = plt.axes([0.1, 0.65, 0.3, 0.1])
             paces_clean = [p for p in paces if p is not None]
@@ -210,10 +212,6 @@ def plot_running() -> None:
                 frameon=False,
             )
         )
-        
-        # 添加热力图到现有SVG中
-        add_heatmap_to_figure(fig, dts, distances)
-        
         fig.savefig("miles.svg")
 
 
@@ -413,148 +411,6 @@ def sync_data(dt_str: str, distance_str: str, heart_str: str, pace_str: str) -> 
         print("no new data")
         return False
     return True
-
-
-# 新增函数：将热力图添加到现有图形中
-def add_heatmap_to_figure(fig, dts: list[datetime], distances: list[float]) -> None:
-    # 创建当年每日跑步数据字典
-    this_year = datetime.now().year
-    daily_distances = {}
-    
-    # 初始化当年所有日期为0
-    for month in range(1, 13):
-        days_in_month = calendar.monthrange(this_year, month)[1]
-        for day in range(1, days_in_month + 1):
-            date_key = datetime(this_year, month, day).strftime("%Y-%m-%d")
-            daily_distances[date_key] = 0.0
-    
-    # 填充实际跑步数据
-    for i, dt in enumerate(dts):
-        if dt.year == this_year:
-            date_key = dt.strftime("%Y-%m-%d")
-            daily_distances[date_key] += distances[i]
-    
-    # 定义颜色映射
-    def get_color(distance: float) -> str:
-        if distance <= 0:
-            return "#ebedf0"  # 灰色 - 无跑步
-        elif distance <= 2.0:
-            return "#96dcff"  # 霜蓝色 (1-2km)
-        elif distance <= 3.5:
-            return "#64c8ff"  # 浅蓝色 (2-3.5km)
-        elif distance <= 5.0:
-            return "#90ee90"  # 浅绿色 (3.5-5km)
-        elif distance <= 6.5:
-            return "#ffee00"  # 黄色 (5-6.5km)
-        elif distance <= 8.0:
-            return "#ffa000"  # 橙色 (6.5-8km)
-        elif distance <= 9.0:
-            return "#ff5000"  # 深橙色 (8-9km)
-        else:
-            return "#c80064"  # 紫色 (9-10km+)
-    
-    # 计算统计数据
-    distance_this_year = sum([distances[i] for i, dt in enumerate(dts) if dt.year == this_year])
-    distance_this_month = sum([
-        distances[i] for i, dt in enumerate(dts) 
-        if dt.year == this_year and dt.month == datetime.now().month
-    ])
-    latest_distance = distances[-1] if distances else 0.0
-    
-    # 创建热力图轴
-    ax_heatmap = fig.add_axes([0.6, 0.3, 0.35, 0.6])  # [left, bottom, width, height]
-    ax_heatmap.set_xlim(0, 54)
-    ax_heatmap.set_ylim(0, 7)
-    ax_heatmap.axis('off')
-    
-    # 添加标题和统计数据
-    ax_heatmap.text(0, 6.5, f"{this_year}", fontsize=12, fontweight='bold')
-    ax_heatmap.text(45, 6.5, "Total:", fontsize=10, color='#767676', ha='right')
-    ax_heatmap.text(53, 6.5, f"{distance_this_year:.2f} km", fontsize=10, ha='right')
-    ax_heatmap.text(45, 5.8, "This month:", fontsize=10, color='#767676', ha='right')
-    ax_heatmap.text(53, 5.8, f"{distance_this_month:.2f} km", fontsize=10, ha='right')
-    ax_heatmap.text(45, 5.1, "Latest:", fontsize=10, color='#767676', ha='right')
-    ax_heatmap.text(53, 5.1, f"{latest_distance:.2f} km", fontsize=10, ha='right')
-    
-    # 创建色块示例
-    color_ranges = [
-        (0, "#ebedf0"),
-        (2.0, "#96dcff"),
-        (3.5, "#64c8ff"),
-        (5.0, "#90ee90"),
-        (6.5, "#ffee00"),
-        (8.0, "#ffa000"),
-        (9.0, "#ff5000"),
-        (10.0, "#c80064")
-    ]
-    
-    ax_heatmap.text(35, 4.2, "Less", fontsize=8, color='#767676')
-    for i, (threshold, color) in enumerate(color_ranges):
-        x = 38 + i * 1.5
-        ax_heatmap.add_patch(plt.Rectangle((x, 4.1), 1.3, 1.3, facecolor=color, edgecolor="#ccc", linewidth=0.5))
-    ax_heatmap.text(50, 4.2, "More", fontsize=8, color='#767676')
-    
-    # 创建热力图网格 (最多53周 x 7天)
-    start_date = datetime(this_year, 1, 1)
-    end_date = datetime(this_year, 12, 31)
-    
-    # 计算一年中的每一天
-    current_date = start_date
-    squares = []
-    while current_date <= end_date:
-        date_str = current_date.strftime("%Y-%m-%d")
-        distance = daily_distances.get(date_str, 0.0)
-        color = get_color(distance)
-        
-        # 计算位置 (每周一列，每天一行)
-        week = current_date.isocalendar()[1]
-        # 处理年初属于上一年最后一周的情况
-        if week >= 52 and current_date.month == 1:
-            week = 0
-        elif week == 1 and current_date.month == 12:
-            week = 52
-            
-        day_of_week = current_date.weekday()  # 周一=0, 周日=6
-        
-        x = week + 1
-        y = 6 - day_of_week  # 反转Y轴，使周一在上
-        
-        squares.append((x, y, color, distance))
-        current_date = datetime.fromordinal(current_date.toordinal() + 1)
-    
-    # 添加矩形
-    for x, y, color, distance in squares:
-        rect = plt.Rectangle((x, y), 0.85, 0.85, facecolor=color, edgecolor="#fff", linewidth=0.5)
-        ax_heatmap.add_patch(rect)
-    
-    # 添加月份标签
-    month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", 
-                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-    
-    # 找到每个月的第一天所在的位置
-    month_positions = {}
-    current_date = start_date
-    while current_date <= end_date:
-        if current_date.day == 1:
-            week = current_date.isocalendar()[1]
-            if week >= 52 and current_date.month == 1:
-                week = 0
-            month_positions[current_date.month] = week + 1
-        current_date = datetime.fromordinal(current_date.toordinal() + 1)
-    
-    for month, x_pos in month_positions.items():
-        ax_heatmap.text(x_pos, 7, month_names[month-1], fontsize=8, color='#767676')
-    
-    # 添加星期标签
-    day_names = ["Mon", "Wed", "Fri"]
-    day_indices = [0, 2, 4]
-    for i, (day_idx, day_name) in enumerate(zip(day_indices, day_names)):
-        y_pos = 6 - day_idx
-        ax_heatmap.text(0, y_pos+0.3, day_name, fontsize=8, color='#767676')
-
-
-
-
 
 
 if __name__ == "__main__":
