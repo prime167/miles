@@ -183,6 +183,11 @@ def plot_running() -> None:
         distance_this_year = sum(
             [distances[i] for i, dt in enumerate(dts) if dt.year == this_year]
         )
+         # 计算本月跑步里程
+        this_month = datetime.now().month
+        distance_this_month = sum(
+            [distances[i] for i, dt in enumerate(dts) if dt.year == this_year and dt.month == this_month]
+        )
         fig.text(
             0.97,
             0.15,
@@ -191,6 +196,7 @@ def plot_running() -> None:
             f"{len(dts)} times\n"
             f"total {accs[-1]:.2f}Km\n"
             f"this year {distance_this_year:.2f}Km\n"
+            f"this month {distance_this_month:.2f}Km\n"
             f"latest {dts[-1]: %Y-%m-%d} {distances[-1]:.2f}Km",
             ha="right",
             va="bottom",
