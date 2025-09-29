@@ -37,7 +37,6 @@ def plot_running() -> None:
         ax.plot(dts, accs, color="#d62728")
         
         # 只在有心率数据时绘制心率小提琴图
-                # 只在有心率数据时绘制心率小提琴图
         if hearts:
             ax2 = plt.axes([0.1, 0.80, 0.3, 0.1])
             hearts_clean = [h for h in hearts if h is not None]
@@ -89,7 +88,6 @@ def plot_running() -> None:
             ax2.tick_params(axis="y", which="major", labelsize="xx-small", length=0)
 
         # 只在有配速数据时绘制配速小提琴图
-                # 只在有配速数据时绘制配速小提琴图
         if paces:
             ax3 = plt.axes([0.1, 0.65, 0.3, 0.1])
             paces_clean = [p for p in paces if p is not None]
@@ -213,6 +211,8 @@ def plot_running() -> None:
             )
         )
         fig.savefig("miles.svg")
+        # 生成热力图
+        generate_heatmap(dts, distances)
 
 
 def pace_label_fmt(val: float, pos) -> str:
@@ -411,6 +411,149 @@ def sync_data(dt_str: str, distance_str: str, heart_str: str, pace_str: str) -> 
         print("no new data")
         return False
     return True
+
+
+# 新增函数：生成热力图
+def generate_heatmap(dts: list[datetime], distances: list[float]) -> None:
+    # 创建当年每日跑步数据字典
+    this_year = datetime.now().year
+    daily_distances = {}
+    
+    # 初始化当年所有日期为0
+    for month in range(1, 13):
+        days_in_month = calendar.monthrange(this_year, month)[1]
+        for day in range(1, days_in_month + 1):
+            date_key = datetime(this_year, month, day).strftime("%Y-%m-%d")
+            daily_distances[date_key] = 0.0
+    
+    # 填充实际跑步数据
+    for i, dt in enumerate(dts):
+        if dt.year == this_year:
+            date_key = dt.strftime("%Y-%m-%d")
+            daily_distances[date_key] += distances[i]
+    
+    # 创建SVG内容
+    svg_content = create_heatmap_svg(daily_distances, this_year, distances)
+    
+    # 保存SVG文件
+    with open("heatmap.svg", "w", encoding="utf-8") as f:
+        f.write(svg_content)
+
+
+# 新增函数：创建热力图SVG
+def create_heatmap_svg(daily_distances: dict, year: int, distances: list[float]) -> str:
+    # 定义颜色映射
+    def get_color(distance: float) -> str:
+        if distance <= 0:
+            return "#ebedf0"  # 灰色 - 无跑步
+        elif distance <= 2.0:
+            return "#96dcff"  # 霜蓝色 (1-2km)
+        elif distance <= 3.5:
+            return "#64c8ff"  # 浅蓝色 (2-3.5km)
+        elif distance <= 5.0:
+            return "#90ee90"  # 浅绿色 (3.5-5km)
+        elif distance <= 6.5:
+            return "#ffee00"  # 黄色 (5-6.5km)
+        elif distance <= 8.0:
+            return "#ffa000"  # 橙色 (6.5-8km)
+        elif distance <= 9.0:
+            return "#ff5000"  # 深橙色 (8-9km)
+        else:
+            return "#c80064"  # 紫色 (9-10km+)
+    
+    # 计算统计数据
+    this_year_distances = [d for i, d in enumerate(distances) if datetime.now().year == datetime.now().year]
+    distance_this_year = sum([d for i, d in enumerate(distances) if datetime.now().year == datetime.now().year])
+    distance_this_month = sum([
+        d for i, d in enumerate(distances) 
+        if datetime.now().year == datetime.now().year and datetime.now().month == datetime.now().month
+    ])
+    latest_distance = distances[-1] if distances else 0.0
+    
+    # 创建SVG头部
+    svg_lines = [
+        '<svg xmlns="http://www.w3.org/2000/svg" width="820" height="180">',
+        '<style>',
+        '.month { font-size: 12px; fill: #767676; }',
+        '.day { font-size: 10px; fill: #767676; }',
+        '.value { font-size: 12px; fill: #000; }',
+        '</style>'
+    ]
+    
+    # 添加标题和统计数据
+    svg_lines.append(f'<text x="10" y="20" class="value">{year}</text>')
+    svg_lines.append(f'<text x="600" y="20" class="value">Total: {distance_this_year:.2f} km</text>')
+    svg_lines.append(f'<text x="600" y="40" class="value">This month: {distance_this_month:.2f} km</text>')
+    svg_lines.append(f'<text x="600" y="60" class="value">Latest: {latest_distance:.2f} km</text>')
+    
+    # 创建色块示例
+    color_ranges = [
+        (0, "#ebedf0"),
+        (2.0, "#96dcff"),
+        (3.5, "#64c8ff"),
+        (5.0, "#90ee90"),
+        (6.5, "#ffee00"),
+        (8.0, "#ffa000"),
+        (9.0, "#ff5000"),
+        (10.0, "#c80064")
+    ]
+    
+    svg_lines.append('<text x="600" y="90" class="day">0 km</text>')
+    for i, (threshold, color) in enumerate(color_ranges):
+        x = 600 + i * 25
+        svg_lines.append(f'<rect x="{x}" y="100" width="20" height="20" fill="{color}" stroke="#ccc" stroke-width="1"/>')
+    svg_lines.append('<text x="750" y="90" class="day">10+ km</text>')
+    
+    # 创建热力图网格 (53周 x 7天)
+    start_date = datetime(year, 1, 1)
+    end_date = datetime(year, 12, 31)
+    
+    # 计算一年中的每一天
+    current_date = start_date
+    day_index = 0
+    while current_date <= end_date:
+        date_str = current_date.strftime("%Y-%m-%d")
+        distance = daily_distances.get(date_str, 0.0)
+        color = get_color(distance)
+        
+        # 计算位置 (每周一行，每天一列)
+        week = current_date.isocalendar()[1]
+        # 处理年初属于上一年最后一周的情况
+        if week >= 52 and current_date.month == 1:
+            week = 0
+        elif week == 1 and current_date.month == 12:
+            week = 52
+            
+        day_of_week = current_date.weekday()  # 周一=0, 周日=6
+        
+        x = 30 + week * 15
+        y = 40 + day_of_week * 15
+        
+        # 添加矩形
+        svg_lines.append(f'<rect x="{x}" y="{y}" width="12" height="12" fill="{color}" stroke="#fff" stroke-width="1"/>')
+        
+        current_date = datetime.fromordinal(current_date.toordinal() + 1)
+        day_index += 1
+    
+    # 添加月份标签
+    month_positions = [0, 4, 8, 12, 17, 21, 25, 30, 34, 38, 43, 47]
+    month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    
+    for i, (pos, name) in enumerate(zip(month_positions, month_names)):
+        x = 30 + pos * 15
+        svg_lines.append(f'<text x="{x}" y="30" class="month">{name}</text>')
+    
+    # 添加星期标签
+    day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    for i, day_name in enumerate(day_names):
+        y = 40 + i * 15 + 10
+        svg_lines.append(f'<text x="10" y="{y}" class="day">{day_name}</text>')
+    
+    # 结束SVG
+    svg_lines.append('</svg>')
+    
+    return "\n".join(svg_lines)
 
 
 if __name__ == "__main__":
