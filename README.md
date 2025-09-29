@@ -4,7 +4,7 @@ As the film *Forrest Gump* said
 
 > run, Forrest, run...
 
-![miles](miles.svg)
+![miles](miles.svg?)
 
 ## Motivation
 
