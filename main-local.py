@@ -1,0 +1,417 @@
+# -*- coding: utf-8 -*-
+import calendar
+import math
+import sys
+from datetime import datetime
+from typing import Callable, Optional, TypeVar, List, Tuple
+import numpy as np
+
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
+import matplotlib.ticker as tick
+from matplotlib.offsetbox import AnnotationBbox, OffsetImage
+
+# ---------------------- 可配置项 ----------------------
+RUNNER = "prime167"
+# -----------------------------------------------------
+
+T = TypeVar("T")
+K = TypeVar("K")
+
+
+def plot_running() -> None:
+    with plt.xkcd():
+        fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
+        ax.spines[["top", "right"]].set_visible(False)
+        locator = mdates.AutoDateLocator(minticks=3, maxticks=7)
+        formatter = mdates.ConciseDateFormatter(locator)
+        ax.xaxis.set_major_locator(locator)
+        ax.xaxis.set_major_formatter(formatter)
+        ax.tick_params(axis="both", which="major", labelsize="small", length=5)
+        ax.tick_params(axis="both", which="minor", labelsize="small", length=5)
+        ax.set_title("Running is not a sport for health, it is a way of life!")
+
+        dts, accs, distances, hearts, paces = get_running_data()
+        this_year = datetime.now().year
+
+        ax.plot(dts, accs, color="#d62728")
+        
+        # 只在有心率数据时绘制心率小提琴图
+        if hearts:
+            ax2 = plt.axes([0.1, 0.80, 0.3, 0.1])
+            hearts_clean = [h for h in hearts if h is not None]
+            if hearts_clean:
+                v11 = ax2.violinplot(
+                    hearts_clean,
+                    orientation="horizontal",
+                    showmedians=True,
+                    showmeans=True,
+                    showextrema=False,
+                    side="low",
+                )
+                hearts_this_year = [
+                    hearts[i] for i, dt in enumerate(dts) if dt.year == this_year and hearts[i] is not None
+                ]
+                v12 = ax2.violinplot(
+                    hearts_this_year,
+                    orientation="horizontal",
+                    showmedians=True,
+                    showmeans=True,
+                    showextrema=False,
+                    side="high",
+                )
+
+                for body in v11["bodies"]:
+                    body.set_facecolor("#ff7f0e")
+                    body.set_edgecolor("#ff7f0e")
+                for body in v12["bodies"]:
+                    body.set_facecolor("#2ca02c")
+                    body.set_edgecolor("#2ca02c")
+                v11["cmedians"].set_linewidth(1)
+                v11["cmedians"].set_color("#ff7f0e")
+                v12["cmedians"].set_linewidth(1)
+                v12["cmedians"].set_color("#2ca02c")
+                v11["cmeans"].set_linewidth(1)
+                v11["cmeans"].set_color("#ff7f0e")
+                v12["cmeans"].set_linewidth(1)
+                v12["cmeans"].set_color("#2ca02c")
+                v11["cmeans"].set_linestyle("--")
+                v12["cmeans"].set_linestyle("--")
+
+                hearts_percentile = np.percentile(hearts_clean, [5, 95])
+                ax2.set_xlim(tuple(hearts_percentile))
+            else:
+                ax2.text(0.5, 0.5, "No HR", transform=ax2.transAxes, ha="center", va="center", fontsize="small")
+            ax2.set_yticklabels([])
+            ax2.spines[["top", "right", "left", "bottom"]].set_visible(False)
+            ax2.tick_params(axis="x", which="major", labelsize="xx-small", length=2)
+            ax2.tick_params(axis="y", which="major", labelsize="xx-small", length=0)
+
+        # 只在有配速数据时绘制配速小提琴图
+        if paces:
+            ax3 = plt.axes([0.1, 0.65, 0.3, 0.1])
+            paces_clean = [p for p in paces if p is not None]
+            if paces_clean:
+                v21 = ax3.violinplot(
+                    paces_clean,
+                    orientation="horizontal",
+                    showmedians=True,
+                    showmeans=True,
+                    showextrema=False,
+                    side="low",
+                )
+                paces_this_year = [paces[i] for i, dt in enumerate(dts) if dt.year == this_year and paces[i] is not None]
+                v22 = ax3.violinplot(
+                    paces_this_year,
+                    orientation="horizontal",
+                    showmedians=True,
+                    showmeans=True,
+                    showextrema=False,
+                    side="high",
+                )
+                for body in v21["bodies"]:
+                    body.set_facecolor("#ff7f0e")
+                    body.set_edgecolor("#ff7f0e")
+                for body in v22["bodies"]:
+                    body.set_facecolor("#2ca02c")
+                    body.set_edgecolor("#2ca02c")
+                v21["cmedians"].set_linewidth(1)
+                v21["cmedians"].set_color("#ff7f0e")
+                v22["cmedians"].set_linewidth(1)
+                v22["cmedians"].set_color("#2ca02c")
+                v21["cmeans"].set_linewidth(1)
+                v21["cmeans"].set_color("#ff7f0e")
+                v22["cmeans"].set_linewidth(1)
+                v22["cmeans"].set_color("#2ca02c")
+                v21["cmeans"].set_linestyle("--")
+                v22["cmeans"].set_linestyle("--")
+
+                paces_percentile = np.percentile(paces_clean, [5, 95])
+                ax3.set_xlim(tuple(paces_percentile))
+                ax3.xaxis.set_major_locator(tick.MaxNLocator(6))
+                ax3.xaxis.set_major_formatter(tick.FuncFormatter(pace_label_fmt))
+            else:
+                ax3.text(0.5, 0.5, "No Pace", transform=ax3.transAxes, ha="center", va="center", fontsize="small")
+            ax3.set_yticklabels([])
+            ax3.spines[["top", "right", "left", "bottom"]].set_visible(False)
+            ax3.tick_params(axis="x", which="major", labelsize="xx-small", length=2)
+            ax3.tick_params(axis="y", which="major", labelsize="xx-small", length=0)
+
+        attendance_all, attendance_this_year = tuple(
+            map(make_circular, get_attendance(dts))
+        )
+        feature = make_circular(
+            [
+                "Jan",
+                "",
+                "",
+                "Apr",
+                "",
+                "",
+                "Jul",
+                "",
+                "",
+                "Oct",
+                "",
+                "",
+            ]
+        )
+        angles_deg = make_circular([a for a in range(0, 360, 30)])
+        angles_rad = make_circular([a * math.pi / 180 for a in range(0, 360, 30)])
+
+        ax4 = plt.axes([0.1, 0.3, 0.25, 0.25], polar=True)
+        ax4.plot(angles_rad, attendance_all, "-", linewidth=1, color="#ff7f0e")
+        ax4.fill(angles_rad, attendance_all, alpha=0.15, zorder=2, color="#ff7f0e")
+        ax4.plot(angles_rad, attendance_this_year, "-", linewidth=1, color="#2ca02c")
+        ax4.fill(
+            angles_rad, attendance_this_year, alpha=0.15, zorder=3, color="#2ca02c"
+        )
+        ax4.spines["polar"].set_linestyle("--")
+        ax4.spines["polar"].set_linewidth(0.5)
+        ax4.spines["polar"].set_color("grey")
+        ax4.tick_params(axis="x", which="major", labelsize="xx-small", length=0)
+        ax4.tick_params(axis="y", which="major", labelsize="xx-small", length=0)
+        ax4.set_thetagrids(angles_deg, feature)
+        ax4.set_yticks([20, 40, 60, 80, 100])
+        ax4.set_yticklabels(["", "", "", "", "100%"])
+        ax4.set_ylim(0, 100)
+        ax4.grid(visible=True, lw=0.5, ls="--")
+
+        years = dts[-1].year - dts[0].year + 1
+        distance_this_year = sum(
+            [distances[i] for i, dt in enumerate(dts) if dt.year == this_year]
+        )
+         # 计算本月跑步里程
+        this_month = datetime.now().month
+        distance_this_month = sum(
+            [distances[i] for i, dt in enumerate(dts) if dt.year == this_year and dt.month == this_month]
+        )
+        fig.text(
+            0.97,
+            0.15,
+            f"{RUNNER}\n"
+            f"{years} years\n"
+            f"{len(dts)} times\n"
+            f"total {accs[-1]:.2f}Km\n"
+            f"this year {distance_this_year:.2f}Km\n"
+            f"this month {distance_this_month:.2f}Km\n"
+            f"latest {dts[-1]: %Y-%m-%d} {distances[-1]:.2f}Km",
+            ha="right",
+            va="bottom",
+            fontsize="small",
+            linespacing=1.5,
+        )
+        img = plt.imread(r"E:\Data\miles\runner.png")
+        ax.add_artist(
+            AnnotationBbox(
+                OffsetImage(img, zoom=0.03),
+                (0.95, 0.05),
+                xycoords="axes fraction",
+                frameon=False,
+            )
+        )
+        fig.savefig(r"E:\Data\miles\miles.svg")
+
+
+def pace_label_fmt(val: float, pos) -> str:
+    min = val // 60
+    sec = val % 60
+    return f"{min:.0f}'{sec:.0f}\""
+
+
+def make_circular(lst: list[T]) -> list[T]:
+    if len(lst) > 1:
+        lst.append(lst[0])
+    return lst
+
+
+def get_attendance(dts: list[datetime]) -> tuple[list[float], list[float]]:
+    dts_all_monthly = groupby(dts, lambda d: d.month)
+    this_year = datetime.now().year
+    dts_this_year = [d for d in dts if d.year == this_year]
+    dts_this_year_monthly = groupby(dts_this_year, lambda d: d.month)
+    days_all_monthly = get_days_monthly(
+        dts[0].year, dts[-1].year, dts[0].month, dts[-1].month
+    )
+    days_this_year_monthly = get_days_monthly(this_year, this_year)
+    attendance_all = []
+    attendance_this_year = []
+    for m in range(1, 13):
+        if m in dts_all_monthly:
+            attendance_all.append(len(dts_all_monthly[m]) / days_all_monthly[m] * 100)
+        else:
+            attendance_all.append(0.0)
+
+        if m in dts_this_year_monthly:
+            attendance_this_year.append(
+                len(dts_this_year_monthly[m]) / days_this_year_monthly[m] * 100
+            )
+        else:
+            attendance_this_year.append(0.0)
+
+    return attendance_all, attendance_this_year
+
+
+def get_days_monthly(
+    year_start: int,
+    year_end: int,
+    month_start: Optional[int] = None,
+    month_end: Optional[int] = None,
+) -> dict[int, int]:
+    days_monthly = {}
+    for y in range(year_start, year_end + 1):
+        for m in range(
+            month_start if month_start and y == year_start else 1,
+            (month_end if month_end and y == year_end else 12) + 1,
+        ):
+            days = calendar.monthrange(y, m)[1]
+            if m in days_monthly:
+                days_monthly[m] += days
+            else:
+                days_monthly[m] = days
+    return days_monthly
+
+
+def groupby(data: list[T], key_func: Callable[[T], K]) -> dict[K, list[T]]:
+    grouped_data = {}
+    for item in data:
+        key = key_func(item)
+        if key in grouped_data:
+            grouped_data[key].append(item)
+        else:
+            grouped_data[key] = [item]
+    return grouped_data
+
+
+def get_running_data() -> tuple[
+    list[datetime], list[float], list[float], list[Optional[int]], list[Optional[int]]
+]:
+    data = []
+    with open(r"E:\Data\miles\running.csv", encoding="utf-8") as file:
+        for line_num, line in enumerate(file, 1):
+            line = line.strip()
+            if not line:
+                continue  # 跳过空行
+            cols = line.split(",")
+            if cols[0] == "DT":
+                continue  # 跳过标题行
+            if len(cols) < 2:
+                print(f"Line {line_num}: too few columns: {line}")
+                continue
+
+            # 解析日期
+            try:
+                dt = datetime.strptime(cols[0], "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                try:
+                    dt = datetime.strptime(cols[0], "%Y-%m-%d")
+                except ValueError:
+                    print(f"Invalid date format: {cols[0]}")
+                    continue
+
+            # 解析距离
+            try:
+                distance = float(cols[1]) if cols[1].strip() else 0.0
+            except (ValueError, IndexError):
+                distance = 0.0
+
+            # 解析心率
+            heart = None
+            if len(cols) > 2 and cols[2].strip():
+                try:
+                    heart = int(cols[2])
+                except ValueError:
+                    heart = None
+
+            # 解析配速（支持 7:25, 7′25″, 7'25" 等格式）
+            pace = None
+            if len(cols) > 3 and cols[3].strip():
+                pace_str = cols[3].strip()
+                import re
+                match = re.match(r"^\s*(\d+)\s*[:′'′’′‘’‘]\s*(\d+)\s*[″""′'′’″”]*\s*$", pace_str)
+                if match:
+                    try:
+                        mins, secs = int(match.group(1)), int(match.group(2))
+                        if 0 <= secs < 60:
+                            pace = mins * 60 + secs
+                        elif secs == 60:
+                            pace = (mins + 1) * 60
+                    except Exception:
+                        pace = None
+
+            if distance <= 0.0:
+                continue
+
+            data.append((dt, distance, heart, pace))
+
+    if not data:
+        print("No valid running data found.")
+        return [], [], [], [], []
+
+    data.sort(key=lambda t: t[0])
+    dts = []
+    accs = []
+    distances = []
+    hearts = []
+    paces = []
+    acc = 0.0
+    for dt, distance, heart, pace in data:
+        acc += distance
+        dts.append(dt)
+        accs.append(acc)
+        distances.append(distance)
+        hearts.append(heart)
+        paces.append(pace)
+    return dts, accs, distances, hearts, paces
+
+
+def sync_data(dt_str: str, distance_str: str, heart_str: str, pace_str: str) -> bool:
+    dt_strs = dt_str.split(",")
+    distances = distance_str.split(",")
+    hearts = heart_str.split(",")
+    paces = pace_str.split(",")
+    n = len(dt_strs)
+    if len(distances) != n:
+        print("distance length not equal dt length")
+        return False
+    elif len(hearts) != n:
+        print("heart rate length not equal dt length")
+        return False
+    elif len(paces) != n:
+        print("pace length not equal dt length")
+        return False
+
+    dts, _, _, _, _ = get_running_data()
+    latest = dts[-1] if dts else None
+    new_data = []
+    for i, dt_str_item in enumerate(dt_strs):
+        try:
+            dt = datetime.strptime(dt_str_item, "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            try:
+                dt = datetime.strptime(dt_str_item, "%Y-%m-%d")
+            except ValueError:
+                print(f"Invalid date format: {dt_str_item}")
+                continue
+
+        if latest is None or dt > latest:
+            new_data.append((dt_str_item, distances[i], hearts[i], paces[i]))
+
+    if new_data:
+        with open("running.csv", "a", encoding="utf-8") as f:
+            for dt_str, distance, heart, pace in sorted(
+                new_data,
+                key=lambda t: datetime.strptime(t[0], "%Y-%m-%d %H:%M:%S") if ":" in t[0]
+                else datetime.strptime(t[0], "%Y-%m-%d")
+            ):
+                f.write(f"{dt_str},{distance},{heart},{pace}\n")
+    else:
+        print("no new data")
+        return False
+    return True
+
+
+
+        
+if __name__ == "__main__":
+    plot_running()
