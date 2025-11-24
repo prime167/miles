@@ -2,6 +2,7 @@
 import calendar
 import math
 import sys
+import os
 from datetime import datetime
 from typing import Callable, Optional, TypeVar, List, Tuple
 import numpy as np
@@ -201,7 +202,10 @@ def plot_running() -> None:
             fontsize="small",
             linespacing=1.5,
         )
-        img = plt.imread(r"E:\Data\miles\runner.png")
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        png = os.path.join(script_dir, "runner.png")
+        svg = os.path.join(script_dir, "miles.svg")
+        img = plt.imread(png)
         ax.add_artist(
             AnnotationBbox(
                 OffsetImage(img, zoom=0.03),
@@ -210,7 +214,7 @@ def plot_running() -> None:
                 frameon=False,
             )
         )
-        fig.savefig(r"E:\Data\miles\miles.svg")
+        fig.savefig(svg)
 
 
 def pace_label_fmt(val: float, pos) -> str:
@@ -287,7 +291,9 @@ def get_running_data() -> tuple[
     list[datetime], list[float], list[float], list[Optional[int]], list[Optional[int]]
 ]:
     data = []
-    with open(r"E:\Data\miles\running.csv", encoding="utf-8") as file:
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    file_path = os.path.join(script_dir, "running.csv")
+    with open(file_path, encoding="utf-8") as file:
         for line_num, line in enumerate(file, 1):
             line = line.strip()
             if not line:
@@ -328,7 +334,7 @@ def get_running_data() -> tuple[
             if len(cols) > 3 and cols[3].strip():
                 pace_str = cols[3].strip()
                 import re
-                match = re.match(r"^\s*(\d+)\s*[:′'′’′‘’‘]\s*(\d+)\s*[″""′'′’″”]*\s*$", pace_str)
+                match = re.match(r"^\s*(\d+)\s*[:′'′’′‘’‘]\s*(\d+)\s*[″""′'′’″”]*\s*$", pace_str.strip())
                 if match:
                     try:
                         mins, secs = int(match.group(1)), int(match.group(2))
